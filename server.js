@@ -4,18 +4,9 @@ const bodyParser = require('body-parser');
 const app = express();
 const PORT = 3000;
 
+
 // Configurar middleware para que Express pueda leer cuerpos de solicitud JSON
 app.use(bodyParser.json());
-
-// Ruta de Bienvenida (Home) para evitar el error "Cannot GET /"
-app.get('/', (req, res) => {
-    res.status(200).send(`
-        <h1>🚀 Servidor API de Proyectos Activo</h1>
-        <p>El servidor está funcionando. Para acceder a la API, usa la URL base: 
-        <strong>/api/v1/projects</strong>, <strong>/api/v1/tasks</strong>, etc.</p>
-        <p>Asegúrate de usar herramientas como Postman o Insomnia para probar los endpoints.</p>
-    `);
-});
 
 // Definición de la URL base
 const BASE_URL = '/api/v1';
@@ -32,8 +23,13 @@ let projects = [
     { "id": 1, "name": "Plataforma educativa", "description": "Sistema de cursos online" }
 ];
 let tasks = [
-    { "id": 1, "title": "Diseñar UI", "description": "Pantalla principal", "status": "todo", "projectID": 1, "assignedTo": 1 }
-];
+// JSON de Tareas: TODOS los campos deben existir, aunque sean null o un valor predeterminado
+{
+    "title": "Diseñar Dashboard", 
+    "description": "Pantalla principal del líder", 
+    "projectID": 1, 
+    "assignedTo": 1
+}];
 let people = [
     { "id": 1, "name": "James Montealegre", "email": "james@correo.com", "role": "Lider tecnico" }
 ];
@@ -56,16 +52,26 @@ app.get(`${BASE_URL}/projects/:id`, (req, res) => {
 });
 
 // 3. POST /api/v1/projects (Crea uno)
+// POST /api/v1/projects (Crea uno)
 app.post(`${BASE_URL}/projects`, (req, res) => {
-    const newProject = req.body;
-    if (!newProject.name) { // Validación básica
-        return res.status(400).json({ message: "El nombre es obligatorio." });
+    // 1. Acceder al cuerpo (req.body)
+    const newProject = req.body; 
+    
+    // Si req.body es undefined, la línea anterior lanza un error 500.
+    if (!newProject || !newProject.name) { 
+        // Esta validación es clave si BodyParser falló o no enviaste 'name'
+        return res.status(400).json({ message: "El nombre es obligatorio y el cuerpo no debe estar vacío." });
     }
-    newProject.id = projectIdCounter++;
-    projects.push(newProject);
+    
+    // 2. Asignar ID único
+    newProject.id = projectIdCounter++; // Usa el contador y lo incrementa
+    
+    // 3. Guardar en la "base de datos"
+    projects.push(newProject); 
+    
+    // 4. Devolver respuesta de éxito (201 Created)
     res.status(201).json({ message: "Proyecto creado", project: newProject });
 });
-
 // 4. PUT /api/v1/projects/:id (Actualiza uno)
 app.put(`${BASE_URL}/projects/:id`, (req, res) => {
     const id = parseInt(req.params.id);
@@ -116,17 +122,28 @@ app.get(`${BASE_URL}/tasks/:id`, (req, res) => {
 });
 
 // 8. POST /api/v1/tasks (Crea una)
+// POST /api/v1/tasks (Crea una)
 app.post(`${BASE_URL}/tasks`, (req, res) => {
     const newTask = req.body;
-    if (!newTask.title || !newTask.projectID) {
+    
+    // VALIDACIÓN CLAVE: Si req.body es undefined o faltan campos esenciales
+    if (!newTask || !newTask.title || !newTask.projectID) {
         return res.status(400).json({ message: "Título y projectID son obligatorios." });
     }
+    
     newTask.id = taskIdCounter++;
-    newTask.status = newTask.status || "todo"; // Establece 'todo' si no se especifica
+    newTask.status = newTask.status || "todo"; // Asigna 'todo' si no se envió status
+    
+    // Asegúrate de que los campos numéricos sean números, ya que vienen como strings del JSON
+    newTask.projectID = parseInt(newTask.projectID);
+    // newTask.assignedTo puede ser undefined, así que lo manejamos si existe:
+    if (newTask.assignedTo) {
+        newTask.assignedTo = parseInt(newTask.assignedTo);
+    }
+
     tasks.push(newTask);
     res.status(201).json({ message: "Tarea creada", task: newTask });
 });
-
 // 9. PUT /api/v1/tasks/:id (Actualiza una)
 app.put(`${BASE_URL}/tasks/:id`, (req, res) => {
     const id = parseInt(req.params.id);
@@ -172,12 +189,21 @@ app.get(`${BASE_URL}/people/:id`, (req, res) => {
 });
 
 // 13. POST /api/v1/people (Crea una)
+// POST /api/v1/people (Crea una persona)
 app.post(`${BASE_URL}/people`, (req, res) => {
     const newPerson = req.body;
-    if (!newPerson.name || !newPerson.email) {
+    
+    // VALIDACIÓN CLAVE: Asegura que req.body existe y contiene los campos esenciales
+    if (!newPerson || !newPerson.name || !newPerson.email) {
+        // Devuelve 400 Bad Request si faltan datos, NO un 500 Internal Error
         return res.status(400).json({ message: "Nombre y email son obligatorios." });
     }
+    
     newPerson.id = peopleIdCounter++;
+    
+    // Asignar un rol por defecto si no se proporciona
+    newPerson.role = newPerson.role || "Miembro"; 
+
     people.push(newPerson);
     res.status(201).json({ message: "Persona creada", person: newPerson });
 });
